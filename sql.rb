@@ -1,27 +1,4 @@
 #Файл содержит SQL запросы которые исполняются программой
-
-def create_db
-<<-END_SQL.gsub(/\s+/, " ").strip
-	CREATE DATABASE IF NOX EXISRS reports
-	CHARACTER SET utf8 COLLATE utf8_bin;
-END_SQL
-end
-
-
-def create_reports_table 
-<<-END_SQL.gsub(/\s+/, " ").strip
-
-   CREATE TBLE IF NOT EXISTS `reports` (
-	`date`  char (11) ,
-    `index` char (30),
-    `start` char (20),
-    `end`   char (20)
-
-    );
-END_SQL
-end
-
-
 def move_data
 <<-END_SQL.gsub(/\s+/, " ").strip
 INSERT INTO `reports`.`r_ops_uptime` (`report_date`,`ops_index`,`time_start`,`time_end`)
@@ -37,8 +14,8 @@ INSERT INTO `reports`.`r_ops_uptime` (`report_date`,`ops_index`,`time_start`,`ti
 		and (`zabbix`.`history_uint`.`itemid` = `zabbix`.`items`.`itemid`) 
 		and (year(from_unixtime(`zabbix`.`history_uint`.`clock`)) = #{$year} )  
 		and (month(from_unixtime(`zabbix`.`history_uint`.`clock`)) =  #{$month} )  
-		and (month(from_unixtime(`zabbix`.`history_uint`.`clock`)) between 01 and 12  
-		and ( `zabbix`.`hosts`.`name` regexp "R.*-N") ))  
+		and (dayofmonth(from_unixtime(`zabbix`.`history_uint`.`clock`)) = #{$day} )
+		and ( `zabbix`.`hosts`.`name` regexp "R.*-N") )
 		GROUP BY `zabbix`.`hosts`.`name` ;
 
 END_SQL
@@ -51,3 +28,26 @@ def set_transaction_lock
 END_SQL
 end
 
+def network_discovery
+<<-END_SQL.gsub(/\s+/, " ").strip
+	
+	INSERT INTO `reports`.`r_network_discovery` (`ReportDate`,`RuleName`, `PCcount` )
+		select '#{$dmy}',T1.rulename, T2.pccount
+			from
+				(select drules.name as 'rulename', drules.druleid as 'rulenum' from zabbix.drules group by drules.druleid) T1,
+				(select count(dhosts.dhostid) as 'pccount', dhosts.druleid as 'rulenum' from zabbix.dhosts group by dhosts.druleid) T2
+			where T2.rulenum = T1.rulenum;        
+
+END_SQL
+end
+
+def rvpn
+<<-END_SQL.gsub(/\s+/, " ").strip
+     INSERT INTO  `reports`.`r_network_discovery` (`ReportDate`,`RuleName`, `PCcount` )
+	select '#{$dmy}',T1.rulename, T2.pccount
+		from
+			(select drules.name as 'rulename', drules.druleid as 'rulenum' from zabbix.drules group by drules.druleid) T1,
+			(select count(dhosts.dhostid) as 'pccount', dhosts.druleid as 'rulenum' from zabbix.dhosts group by dhosts.druleid) T2
+		where T2.rulenum = T1.rulenum and T1.rulename like '%_RVPN' and T2.pccount > 0;        
+END_SQL
+end
